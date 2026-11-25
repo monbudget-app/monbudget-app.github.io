@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html lang="fr">
 <head>
+<script>if(/\.github\.io$/.test(location.hostname))location.replace('https://mon-budget-fcfa.pages.dev/'+location.hash)</script>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>Mon Budget</title>
@@ -522,7 +523,7 @@ async function shareBilan(kind){
   g.fillStyle='#6E685F';g.font='500 28px '+F;
   const diff=st.prevOut?Math.round((st.out-st.prevOut)/st.prevOut*100):null;
   g.fillText((yr?'Moyenne par mois : ':'Moyenne par jour : ')+fmtN(st.avg)+' FCFA'+(diff!==null?(yr?' · vs année précédente : ':' · vs mois précédent : ')+(diff>0?'+':'')+diff+' %':''),80,1240);
-  g.fillText('monbudget.pages.dev',80,1290);
+  g.fillText('mon-budget-fcfa.pages.dev',80,1290);
   const blob=await new Promise(r=>cv.toBlob(r,'image/png')),name=yr?`bilan-${y}.png`:`bilan-${MOIS[m]}-${y}.png`,file=new File([blob],name,{type:'image/png'});
   try{if(navigator.canShare&&navigator.canShare({files:[file]})){await navigator.share({files:[file],title:yr?'Bilan '+y:'Bilan '+MOIS[m]+' '+y});return}}catch(e){if(e&&e.name==='AbortError')return}
   const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=name;document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},1500);toast('Image du bilan téléchargée')}

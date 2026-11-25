@@ -1,6 +1,6 @@
 // Mon Budget — service worker : fonctionnement hors ligne
-const V = 'mon-budget-v11';
-const CORE = ['./', './index.html', './manifest.webmanifest', './icons/icon-192.png', './icons/icon-512.png', './icons/maskable-512.png'];
+const V = 'mon-budget-v12';
+const CORE = ['./', './manifest.webmanifest', './icons/icon-192.png', './icons/icon-512.png', './icons/maskable-512.png'];
 
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(V).then(c => c.addAll(CORE.map(u => new Request(u, { cache: 'reload' })))).then(() => self.skipWaiting()));
@@ -14,7 +14,9 @@ self.addEventListener('activate', e => {
   );
 });
 
-const put = (req, res) => { if (res && (res.ok || res.type === 'opaque')) { const cp = res.clone(); caches.open(V).then(c => c.put(req, cp)); } return res; };
+// Une réponse redirigée ne peut pas servir une page : on la recopie proprement
+const clean = res => res && res.redirected ? res.blob().then(b => new Response(b, { status: res.status, statusText: res.statusText, headers: res.headers })) : Promise.resolve(res);
+const put = (req, res) => { if (res && (res.ok || res.type === 'opaque')) { const cp = res.clone(); clean(cp).then(x => caches.open(V).then(c => c.put(req, x))); } return res; };
 const isHtml = res => res && res.ok && (res.headers.get('content-type') || '').includes('text/html');
 
 self.addEventListener('fetch', e => {
@@ -28,8 +30,8 @@ self.addEventListener('fetch', e => {
     const isApp = u.origin === scope.origin && (u.pathname === scope.pathname || u.pathname === scope.pathname + 'index.html');
     if (!isApp) return;
     e.respondWith((async () => {
-      const cached = await caches.match('./index.html');
-      const net = fetch(r.url, { cache: 'no-cache' }).then(res => { if (isHtml(res)) put('./index.html', res); return res; });
+      const cached = await caches.match('./').then(clean);
+      const net = fetch(r.url, { cache: 'no-cache' }).then(res => { if (isHtml(res)) put('./', res); return clean(res); });
       if (!cached) return net;
       return Promise.race([net.catch(() => cached), new Promise(ok => setTimeout(() => ok(cached), 2500))]);
     })());
