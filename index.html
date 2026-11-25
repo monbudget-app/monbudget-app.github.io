@@ -67,6 +67,7 @@ svg.i{width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:2;stroke
 .sum div:last-child{border:0}
 .sum span{color:var(--mut);font-size:15px}
 .sum b{font-size:19px;font-weight:700;white-space:nowrap}
+.sum .tot span{font-weight:700;color:var(--ink)}
 .sum.ana div{align-items:center;gap:14px}.sum.ana span{flex:0 1 auto}.sum.ana b{white-space:normal;text-align:right;min-width:0;overflow-wrap:anywhere;font-size:17px}
 .sum small,.txa small{font:500 12px var(--font);color:var(--mut)}
 .pos{color:var(--g)}.neg{color:var(--r)}
@@ -470,7 +471,7 @@ function loadRates(force){if(!force&&RATES&&Date.now()-RATES.t<12*3600e3)return 
   ratesP.finally(()=>{ratesP=null});return ratesP}
 function rateTxt(from,to){const r=conv(1,to,from);return r>=1?`1 ${CS(to)} = ${fmtN(r,r<100?'USD':from)} ${CS(from)}`:`1 ${CS(from)} = ${fmtN(conv(1,from,to),'USD')} ${CS(to)}`}
 /* Traduction de l'interface */
-const I18NV='34';let DICT=null,TPL=[];const TRC=new Map(),OUT=new Set();
+const I18NV='35';let DICT=null,TPL=[];const TRC=new Map(),OUT=new Set();
 const reEsc=x=>x.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
 function setDict(d){DICT=d&&typeof d==='object'?d:null;TPL=[];TRC.clear();if(!DICT)return;
   for(const k in DICT){if(!/\{\d+\}/.test(k))continue;const ord=[];const re=new RegExp('^'+k.split(/(\{\d+\})/).map(x=>{const m=x.match(/^\{(\d+)\}$/);if(m){ord.push(+m[1]);return '([\\s\\S]*?)'}return reEsc(x)}).join('')+'$');
@@ -558,7 +559,10 @@ function txItem(x,withDate){const xc=x.cur||'XAF',fx=xc!==CUR()?`<span class="fx
   const c=cat(x.cat);
   return `<button class="tx" data-id="${esc(x.id)}"><span class="dot" style="--c:${okColor(c.color)}">${esc(TN(c.name).charAt(0).toUpperCase())}</span><span class="txm"><b>${esc(c.name)}</b><small>${withDate?esc(dayLabel(x.date))+' · ':''}${esc(pay(x.pay).name)}${x.note?' · '+esc(x.note):''}${String(x.id).startsWith('r_')?' · '+esc(tr('mensuel')):''}${x.m?' · '+esc(tr('compté en {0}',[MN(+x.m.slice(5)-1)])):''}${byName(x)}${fx}</small></span><span class="txa ${x.type}">${x.type==='in'?'+':'−'}${fmtN(x.amount,xc)}<small>${CS(xc)}</small></span></button>`}
 function byName(x){if(SPACE.kind!=='shared'||!x.by)return'';const sp=(C.spaces||[]).find(z=>z.gid===SPACE.gid),em=sp&&sp.memberEmails&&sp.memberEmails[x.by]||'';return em?' · '+esc(tr('par {0}',[em.split('@')[0]])):''}
-const sumCard=(i,o,f='all')=>`<div class="sum">${f!=='out'?`<div><span>Entrées</span><b class="pos">+${fmtN(i)} <small>${CS()}</small></b></div>`:''}${f!=='in'?`<div><span>Dépenses</span><b class="neg">−${fmtN(o)} <small>${CS()}</small></b></div>`:''}${f==='all'?`<div><span>Différence</span><b>${signed(i-o)} <small>${CS()}</small></b></div>`:''}</div>`;
+function carryBefore(mk){let c=0,any=false;for(const x of S.tx)if(MK(x)<mk){any=true;c+=earned(x)-spent(x)}return any?c:null}
+function repLabel(mk){const pm=prevMonth(mk),n=MN(+pm.slice(5)-1);return LANG==='fr'?'Report '+(/^[aeiouyhéè]/i.test(n)?"d'":'de ')+n:tr('Report de {0}',[n])}
+const DOTS='<span class="dots">••••</span>';
+const sumCard=(i,o,f='all',carry=null,mk='',hid=false)=>carry!=null&&f==='all'?`<div class="sum"><div><span translate="no">${esc(repLabel(mk))}</span><b>${hid?DOTS:signed(carry)} <small>${CS()}</small></b></div><div><span>Entrées</span><b class="pos">+${fmtN(i)} <small>${CS()}</small></b></div><div><span>Dépenses</span><b class="neg">−${fmtN(o)} <small>${CS()}</small></b></div><div class="tot"><span>Disponible</span><b class="${carry+i-o<0?'neg':''}">${hid?DOTS:signed(carry+i-o)} <small>${CS()}</small></b></div></div>`:`<div class="sum">${f!=='out'?`<div><span>Entrées</span><b class="pos">+${fmtN(i)} <small>${CS()}</small></b></div>`:''}${f!=='in'?`<div><span>Dépenses</span><b class="neg">−${fmtN(o)} <small>${CS()}</small></b></div>`:''}${f==='all'?`<div><span>Différence</span><b>${signed(i-o)} <small>${CS()}</small></b></div>`:''}</div>`;
 function meter(spent,limit,label){const p=limit?spent/limit:0,cls=p>=1?'over':p>=.8?'warn':'';
   return `<div class="meter ${cls}"><div class="mt"><span>${esc(label)}</span><span>${fmtN(spent)} / ${fmtN(limit)} ${CS()}</span></div><div class="bar"><i style="width:${Math.min(100,p*100).toFixed(1)}%"></i></div><small>${p>=1?tr('Budget dépassé de {0}',[money(spent-limit)]):p>=.8?tr('Attention : {0} % utilisé · reste {1}',[Math.round(p*100),money(limit-spent)]):tr('Reste {0}',[money(limit-spent)])}</small></div>`}
 
@@ -574,7 +578,7 @@ function vHome(){
   if(deferred&&!standalone())h+=`<div class="welcome"><b>Installer l'application</b><p>Ajoutez Mon Budget à l'écran d'accueil pour l'ouvrir comme une vraie application, même sans Internet.</p><button class="primary" id="installBtn">Installer</button></div>`;
   if(!S.tx.length)return h+`<div class="welcome"><b>Bienvenue !</b><p>Notez votre première dépense ou entrée. Plus tard, utilisez le bouton + en bas à droite.</p><div class="btns"><button class="primary" id="goOut">Ajouter une dépense</button><button id="goIn">Ajouter une entrée</button></div></div></div>`;
   h+=quickRow();
-  h+=`<h2>${MY(m,y)}</h2>`+sumCard(sum(mtx,'in'),sum(mtx,'out'));
+  h+=`<h2>${MY(m,y)}</h2>`+sumCard(sum(mtx,'in'),sum(mtx,'out'),'all',carryBefore(mk),mk,hid);
   if(S.budget.on&&S.budget.total)h+=meter(sum(mtx,'out'),S.budget.total,'Budget du mois');
   const td=S.tx.filter(x=>x.date===today()).sort(cmp),tout=sum(td,'out');
   h+=`<h2>Aujourd'hui ${tout?`<span class="mut">−${fmtN(tout)} ${CS()} dépensés</span>`:''}</h2>`+(td.length?`<div class="hbtns"><button type="button" class="pill" id="todayToggle" aria-expanded="${!!P.todayOpen}">${P.todayOpen?"Masquer l'aperçu":'Aperçu'}</button></div>`
@@ -669,7 +673,7 @@ function vHist(){
   <div class="hf"><input type="search" id="hq" placeholder="Rechercher : note, catégorie, montant…" value="${esc(H.q)}" autocomplete="off" enterkeyhint="search">
   <div class="hsel"><select id="hcat" aria-label="Catégorie"><option value="">Toutes catégories</option>${S.cats.filter(c=>H.f==='all'||c.type===H.f).map(c=>`<option value="${esc(c.id)}" data-c="${okColor(c.color)}" ${H.cat===c.id?'selected':''}>${esc(c.name)}</option>`).join('')}</select>
   <select id="hpay" aria-label="Moyen de paiement"><option value="">Tous les moyens</option>${S.pays.map(p=>`<option value="${esc(p.id)}" ${H.pay===p.id?'selected':''}>${esc(p.name)}</option>`).join('')}</select></div>
-  ${filtering?'<button type="button" class="link" id="hclear">Effacer la recherche et les filtres</button>':''}</div>`+sumCard(inc,out,H.f);
+  ${filtering?'<button type="button" class="link" id="hclear">Effacer la recherche et les filtres</button>':''}</div>`+(H.mode==='month'&&!filtering?sumCard(inc,out,H.f,carryBefore(monthKey(H.d.getFullYear(),H.d.getMonth())),monthKey(H.d.getFullYear(),H.d.getMonth()),HB()&&!P.balShow):sumCard(inc,out,H.f));
   const shown=H.f==='all'?all:H.f==='out'?all.filter(x=>x.type==='out'||(x.type==='tr'&&x.fee)):all.filter(x=>x.type==='in');
   if(!shown.length)return h+`<div class="empty" style="margin-top:14px">${H.f==='in'?'Aucune entrée':H.f==='out'?'Aucune dépense':'Aucune opération'} sur cette période.</div></div>`;
   const y=H.d.getFullYear();
@@ -860,7 +864,7 @@ function vSet(){
     +srow({id:'shareBtn',icon:'share',label:"Partager l'application"})
     +srow({id:'guideBtn',icon:'info',label:'Guide de démarrage'})
     +(standalone()?srow({icon:'phone',label:'Installation',value:'Installée',noArrow:1}):srow({id:deferred?'installBtn':'installHelp',icon:'phone',label:'Installer sur ce téléphone'}))
-    +srow({icon:'info',label:'Version',value:'3.4',noArrow:1})+`</div>`;
+    +srow({icon:'info',label:'Version',value:'3.5',noArrow:1})+`</div>`;
   h+=`<div class="sec">Zone sensible</div><div class="group">`+(C.user?srow({id:'logoutBtn',icon:'logout',label:'Se déconnecter',noArrow:1}):'')
     +srow({id:'wipeBtn',icon:'trash',label:'Effacer toutes les données',danger:1,noArrow:1})+`</div>`;
   return h+`<p class="ver mut">Mon Budget · ${S.tx.length} opération${S.tx.length>1?'s':''} enregistrée${S.tx.length>1?'s':''}</p></div>`}
@@ -1086,7 +1090,7 @@ function fillSheet(){
   const showPay=!gm||F.src!=='none';$('#payLbl').hidden=!showPay;$('#payChips').hidden=!showPay;
   $('#payLbl').textContent=isTr?'De':F.type==='in'?'Reçu par':'Payé par';
   if(isTr){$('#payChips').querySelector('.chip.add').remove();$('#toChips').innerHTML=S.pays.map(p=>`<button type="button" class="chip" data-to="${esc(p.id)}" aria-pressed="${p.id===F.to}">${esc(p.name)}</button>`).join('')}
-  $('#dateW').hidden=F.mode==='fav'||(gm&&F.src==='none');$('#prevW').hidden=F.mode!=='tx';updPrev();$('#dateLbl').textContent=F.mode==='rec'?'Première échéance':'Date';
+  $('#dateW').hidden=F.mode==='fav'||(gm&&F.src==='none');$('#prevW').hidden=F.mode!=='tx'||!$('#optPrev').checked||!F.id;updPrev();$('#dateLbl').textContent=F.mode==='rec'?'Première échéance':'Date';
   $('#micBtn').hidden=!SR||isTr;
   $('#optBox').hidden=!!F.id||isTr||F.mode!=='tx';if(gm)$('#payLbl').textContent=F.mode==='goal'?'Payé par':'Reçu par';$('#optFavW').hidden=F.type!=='out';
   $('#note').placeholder=isTr?'Ex. : retrait au point Orange Money':F.mode==='fav'?'Nom court, ex. : Taxi':"Ex. : taxi pour l'école"}
