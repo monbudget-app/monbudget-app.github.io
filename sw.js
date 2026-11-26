@@ -1,5 +1,5 @@
 // Mon Budget — service worker : fonctionnement hors ligne
-const V = 'mon-budget-v15';
+const V = 'mon-budget-v16';
 const CORE = ['./', './manifest.webmanifest', './icons/icon-192.png', './icons/icon-512.png', './icons/maskable-512.png'];
 
 self.addEventListener('install', e => {
