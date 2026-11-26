@@ -68,6 +68,13 @@ svg.i{width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:2;stroke
 .sum span{color:var(--mut);font-size:15px}
 .sum b{font-size:19px;font-weight:700;white-space:nowrap}
 .sum .tot span{font-weight:700;color:var(--ink)}
+.sum .dr{cursor:pointer}.sum .dr.d1{border-top:1px dashed var(--line);margin-top:-1px}.sum .dr b{font-size:17px}
+.accs{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.acc{display:flex;flex-direction:column;gap:4px;min-width:0;padding:12px 14px;border-radius:14px;background:var(--sf);border:1px solid var(--line);box-shadow:var(--shadow-card);color:var(--ink);text-decoration:none}
+.acc span{color:var(--mut);font-size:14px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.acc b{font-size:18px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.acc small{font:500 12px var(--font);color:var(--mut)}
+.acc{position:relative;cursor:pointer}.acc input{position:absolute;top:10px;right:10px;width:22px;height:22px;min-height:0;margin:0;accent-color:var(--g)}.acc span{padding-right:28px}.acc.nt span,.acc.nt b{opacity:.45}
+.hero .hsub{margin-top:4px;font-size:14px;font-weight:600;opacity:.8}
+.srow.pay{gap:12px}.srow.pay.off .sl{opacity:.45}
 .sum.ana div{align-items:center;gap:14px}.sum.ana span{flex:0 1 auto}.sum.ana b{white-space:normal;text-align:right;min-width:0;overflow-wrap:anywhere;font-size:17px}
 .sum small,.txa small{font:500 12px var(--font);color:var(--mut)}
 .pos{color:var(--g)}.neg{color:var(--r)}
@@ -478,7 +485,7 @@ function loadRates(force){if(!force&&RATES&&Date.now()-RATES.t<12*3600e3)return 
   ratesP.finally(()=>{ratesP=null});return ratesP}
 function rateTxt(from,to){const r=conv(1,to,from);return r>=1?`1 ${CS(to)} = ${fmtN(r,r<100?'USD':from)} ${CS(from)}`:`1 ${CS(from)} = ${fmtN(conv(1,from,to),'USD')} ${CS(to)}`}
 /* Traduction de l'interface */
-const I18NV='371';let DICT=null,TPL=[];const TRC=new Map(),OUT=new Set();
+const I18NV='38';let DICT=null,TPL=[];const TRC=new Map(),OUT=new Set();
 const reEsc=x=>x.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
 function setDict(d){DICT=d&&typeof d==='object'?d:null;TPL=[];TRC.clear();if(!DICT)return;
   for(const k in DICT){if(!/\{\d+\}/.test(k))continue;const ord=[];const re=new RegExp('^'+k.split(/(\{\d+\})/).map(x=>{const m=x.match(/^\{(\d+)\}$/);if(m){ord.push(+m[1]);return '([\\s\\S]*?)'}return reEsc(x)}).join('')+'$');
@@ -527,11 +534,24 @@ function dayLabel(s){const d=parse(s),t=new Date(),y=new Date();y.setDate(t.getD
 const KEY='monbudget.v1';
 try{localStorage.removeItem('monbudget.lock');localStorage.removeItem('monbudget.ab')}catch(e){}
 const C={A:null,Au:null,F:null,auth:null,db:null,user:null,unsubs:[],known:new Map(),knownMeta:null,metaReady:false,pending:false,failed:false};
+const PAYC={CM:['Orange Money','MTN MoMo'],GA:['Airtel Money','Moov Money'],CG:['MTN MoMo','Airtel Money'],CD:['M-Pesa','Orange Money','Airtel Money'],TD:['Airtel Money','Moov Money'],CF:['Orange Money'],
+  SN:['Wave','Orange Money','Mixx by Yas'],CI:['Orange Money','MTN MoMo','Moov Money','Wave'],ML:['Orange Money','Moov Money','Wave'],BF:['Orange Money','Moov Money','Wave'],BJ:['MTN MoMo','Moov Money','Celtiis Cash'],TG:['Mixx by Yas','Flooz'],NE:['Airtel Money','Moov Money'],GN:['Orange Money','MTN MoMo'],
+  GH:['MTN MoMo','Telecel Cash','AT Money'],NG:['OPay','PalmPay','Moniepoint'],KE:['M-Pesa','Airtel Money'],UG:['MTN MoMo','Airtel Money'],RW:['MTN MoMo','Airtel Money'],TZ:['M-Pesa','Mixx by Yas','Airtel Money'],MG:['MVola','Orange Money','Airtel Money'],
+  CN:['Alipay','WeChat Pay'],IN:['UPI'],BR:['Pix'],US:['PayPal','Venmo','Zelle'],CA:['Interac','PayPal'],FR:['PayPal'],BE:['Payconiq','PayPal'],GB:['PayPal'],DE:['PayPal'],ES:['Bizum'],PT:['MB Way']};
+const AFRP=new Set('CM GA CG CD TD CF GQ SN CI ML BF BJ TG NE GN GH NG KE UG RW TZ MG'.split(' '));
+const paySug=cc=>['Espèces',...(PAYC[cc]||[]),'Banque',...(AFRP.has(cc)?[]:['Carte bancaire'])];
+const livePays=()=>S.pays.filter(p=>!p.del);
+const activePays=()=>S.pays.filter(p=>!p.off&&!p.del);
+const inTot=p=>!p.nt&&!p.del,selMode=()=>S.pays.some(p=>!inTot(p));
+function flowSel(list,sel){let i=0,o=0;for(const x of list){const v=A(x);if(x.type==='tr'){const a=sel.has(x.pay),b=sel.has(x.to);if(a&&b)o+=AF(x);else{if(a)o+=v+AF(x);if(b)i+=v}}else if(sel.has(x.pay)){if(x.type==='in')i+=v;else o+=v}}return{i,o}}
+const initSum=()=>S.pays.reduce((a,p)=>a+(+p.init||0),0);
+const payBal=pid=>{const p=S.pays.find(z=>z.id===pid),f=payFlow(S.tx,pid);return(+(p&&p.init)||0)+f.i-f.o};
+const totalBal=()=>S.pays.filter(inTot).reduce((a,p)=>a+payBal(p.id),0);
 function fresh(){
   const o=['Nourriture','Transport','Logement','Études & fournitures','Crédit & Internet','Santé','Loisirs','Famille & dons','Divers'];
   const i=['Famille','Bourse','Salaire / Alternance','Petits travaux','Cadeaux','Autres revenus'];
   return{v:1,tx:[],cats:[...o.map((n,k)=>({id:'o'+k,name:n,type:'out',color:PALETTE[k]})),...i.map((n,k)=>({id:'i'+k,name:n,type:'in',color:PALETTE[(k+4)%12]}))],
-    pays:['Espèces','Orange Money','MTN MoMo','Banque'].map((n,k)=>({id:'p'+k,name:n})),budget:{on:false,total:0,cats:{}},last:{},rec:[],fav:[],goals:[],debts:[],cur:PCUR()}
+    pays:paySug(PROF.country).map((n,k)=>({id:'p'+k,name:n})),budget:{on:false,total:0,cats:{}},last:{},rec:[],fav:[],goals:[],debts:[],cur:PCUR()}
 }
 function load(k){try{return JSON.parse(localStorage.getItem(k))}catch(e){return null}}
 let MODE=load('monbudget.mode');
@@ -566,15 +586,15 @@ function txItem(x,withDate){const xc=x.cur||'XAF',fx=xc!==CUR()?`<span class="fx
   const c=cat(x.cat);
   return `<button class="tx" data-id="${esc(x.id)}"><span class="dot" style="--c:${okColor(c.color)}">${esc(TN(c.name).charAt(0).toUpperCase())}</span><span class="txm"><b>${esc(c.name)}</b><small>${withDate?esc(dayLabel(x.date))+' · ':''}${esc(pay(x.pay).name)}${x.note?' · '+esc(x.note):''}${String(x.id).startsWith('r_')?' · '+esc(tr('mensuel')):''}${x.m?' · '+esc(tr('compté en {0}',[MN(+x.m.slice(5)-1)])):''}${byName(x)}${fx}</small></span><span class="txa ${x.type}">${x.type==='in'?'+':'−'}${fmtN(x.amount,xc)}<small>${CS(xc)}</small></span></button>`}
 function byName(x){if(SPACE.kind!=='shared'||!x.by)return'';const sp=(C.spaces||[]).find(z=>z.gid===SPACE.gid),em=sp&&sp.memberEmails&&sp.memberEmails[x.by]||'';return em?' · '+esc(tr('par {0}',[em.split('@')[0]])):''}
-function carryBefore(mk){let c=0,any=false;for(const x of S.tx)if(MK(x)<mk){any=true;c+=earned(x)-spent(x)}return any?c:null}
+function carryBefore(mk){let c=initSum(),any=c!==0;for(const x of S.tx)if(MK(x)<mk){any=true;c+=earned(x)-spent(x)}return any?c:null}
 function repLabel(mk){const pm=prevMonth(mk),n=MN(+pm.slice(5)-1);return LANG==='fr'?'Report '+(/^[aeiouyhéè]/i.test(n)?"d'":'de ')+n:tr('Report de {0}',[n])}
 const DOTS='<span class="dots">••••</span>';
-const sumCard=(i,o,f='all',carry=null,mk='',hid=false)=>{const V=x=>hid?DOTS:x,rows=[];
-  if(carry!=null&&f==='all')rows.push(`<div><span translate="no">${esc(repLabel(mk))}</span><b>${V(signed(carry))} <small>${CS()}</small></b></div>`);
+const sumCard=(i,o,f='all',carry=null,mk='',hid=false,extra='')=>{const V=x=>hid?DOTS:x,rows=[];
+  if(carry!=null&&f==='all')rows.push(`<div><span translate="no">${esc(S.tx.some(x=>MK(x)<mk)?repLabel(mk):tr('Soldes de départ'))}</span><b>${V(signed(carry))} <small>${CS()}</small></b></div>`);
   if(f!=='out')rows.push(`<div><span>Entrées</span><b class="pos">${V('+'+fmtN(i))} <small>${CS()}</small></b></div>`);
   if(f!=='in')rows.push(`<div><span>Dépenses</span><b class="neg">${V('−'+fmtN(o))} <small>${CS()}</small></b></div>`);
   if(f==='all')rows.push(carry!=null?`<div class="tot"><span>Disponible</span><b class="${carry+i-o<0&&!hid?'neg':''}">${V(signed(carry+i-o))} <small>${CS()}</small></b></div>`:`<div><span>Différence</span><b>${V(i?signed(i-o):'0')} <small>${CS()}</small></b></div>`);
-  return `<div class="sum">${rows.join('')}</div>`};
+  return `<div class="sum">${rows.join('')}${extra}</div>`};
 function meter(spent,limit,label){const p=limit?spent/limit:0,cls=p>=1?'over':p>=.8?'warn':'';
   return `<div class="meter ${cls}"><div class="mt"><span>${esc(label)}</span><span>${fmtN(spent)} / ${fmtN(limit)} ${CS()}</span></div><div class="bar"><i style="width:${Math.min(100,p*100).toFixed(1)}%"></i></div><small>${p>=1?tr('Budget dépassé de {0}',[money(spent-limit)]):p>=.8?tr('Attention : {0} % utilisé · reste {1}',[Math.round(p*100),money(limit-spent)]):tr('Reste {0}',[money(limit-spent)])}</small></div>`}
 
@@ -583,16 +603,23 @@ let deferred=null;
 const standalone=()=>matchMedia('(display-mode: standalone)').matches||navigator.standalone===true;
 function vHome(){
   const t=new Date(),y=t.getFullYear(),m=t.getMonth(),mk=monthKey(y,m);
-  const mtx=S.tx.filter(x=>MK(x)===mk),bal=sum(S.tx,'in')-sum(S.tx,'out');
+  const mtx=S.tx.filter(x=>MK(x)===mk),bal=totalBal();
   const hid=HB();
-  let h=`<section class="hero"><div class="brand"><img src="icons/icon-192.png" alt="">${C.user?`<button type="button" class="spsw" id="spBtn" aria-haspopup="true">${esc(spaceName())}<svg class="i" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg></button>`:'Mon Budget'}${MODE==='cloud'?`<span class="sync">${esc(syncLabel())}</span>`:''}</div>${P.spOpen?spMenu():''}<div class="hl">Solde total<button type="button" class="eye" id="eyeBtn" aria-label="${hid?'Afficher le solde':'Masquer le solde'}">${hid?SI.eye:SI.eyeOff}</button></div><div class="big">${hid?'<span class="dots">••••••</span>':(bal<0?'−':'')+fmtN(bal)}<small> ${CS()}</small></div></section><div class="band">`;
+  let h=`<section class="hero"><div class="brand"><img src="icons/icon-192.png" alt="">${C.user?`<button type="button" class="spsw" id="spBtn" aria-haspopup="true">${esc(spaceName())}<svg class="i" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg></button>`:'Mon Budget'}${MODE==='cloud'?`<span class="sync">${esc(syncLabel())}</span>`:''}</div>${P.spOpen?spMenu():''}<div class="hl">Solde total<button type="button" class="eye" id="eyeBtn" aria-label="${hid?'Afficher le solde':'Masquer le solde'}">${hid?SI.eye:SI.eyeOff}</button></div><div class="big">${hid?'<span class="dots">••••••</span>':(bal<0?'−':'')+fmtN(Math.abs(roundC(bal)))}<small> ${CS()}</small></div>${selMode()?`<div class="hsub" translate="no">${S.pays.filter(inTot).map(p=>esc(tr(p.name))).join(' + ')}</div>`:''}</section><div class="band">`;
   {const al=debtAlerts();if(al.length)h+=`<button type="button" class="remind" data-gotab="dettes">${SI.bell}<span>${al.map(d=>esc(tr(d.kind==='lent'?(d.due<today()?'{0} devait vous rendre {1} le {2}':'{0} doit vous rendre {1} le {2}'):(d.due<today()?'Vous deviez rendre {1} à {0} le {2}':'À rendre : {1} à {0} le {2}'),[d.person,money(d.amount-d.repaid),dueLabel(d.due)]))).join('<br>')}</span></button>`}
   if(C.user&&!C.user.emailVerified&&!P.verHide)h+=verifyCard();
   if(deferred&&!standalone())h+=`<div class="welcome"><b>Installer l'application</b><p>Ajoutez Mon Budget à l'écran d'accueil pour l'ouvrir comme une vraie application, même sans Internet.</p><button class="primary" id="installBtn">Installer</button></div>`;
   if(!S.tx.length)return h+`<div class="welcome"><b>Bienvenue !</b><p>Notez votre première dépense ou entrée. Plus tard, utilisez le bouton + en bas à droite.</p><div class="btns"><button class="primary" id="goOut">Ajouter une dépense</button><button id="goIn">Ajouter une entrée</button></div></div></div>`;
   h+=quickRow();
-  h+=`<h2>${MY(m,y)}</h2>`+sumCard(sum(mtx,'in'),sum(mtx,'out'),'all',carryBefore(mk),mk,hid);
+  {const dl=S.debts.filter(d=>d.amount>d.repaid),owed=dl.filter(d=>d.kind==='lent').reduce((a,d)=>a+d.amount-d.repaid,0),owe=dl.filter(d=>d.kind!=='lent').reduce((a,d)=>a+d.amount-d.repaid,0),Vd=x=>hid?DOTS:x;
+  const dx=(owed?`<div class="dr" data-gotab="dettes" role="button"><span>On me doit</span><b class="pos">${Vd('+'+fmtN(owed))} <small>${CS()}</small></b></div>`:'')+(owe?`<div class="dr${owed?'':' d1'}" data-gotab="dettes" role="button"><span>Je dois</span><b class="neg">${Vd('−'+fmtN(owe))} <small>${CS()}</small></b></div>`:'');
+  let mi=sum(mtx,'in'),mo=sum(mtx,'out'),car=carryBefore(mk);
+  if(selMode()){const sel=new Set(S.pays.filter(inTot).map(p=>p.id)),f=flowSel(mtx,sel),prev=S.tx.filter(x=>MK(x)<mk),pf=flowSel(prev,sel),ini=S.pays.filter(inTot).reduce((a,p)=>a+(+p.init||0),0);mi=f.i;mo=f.o;car=prev.length||ini?ini+pf.i-pf.o:null}
+  h+=`<h2>${MY(m,y)}</h2>`+sumCard(mi,mo,'all',car,mk,hid,dx.replace('class="dr"','class="dr d1"'))}
   if(S.budget.on&&S.budget.total)h+=meter(sum(mtx,'out'),S.budget.total,'Budget du mois');
+  if(!hid){const ac=livePays().map(p=>({p,v:roundC(payBal(p.id))})).filter(o=>!o.p.off||o.v);
+   h+=`<h2>Mes comptes <a class="link h2b" href="#reg-paiements">Modifier</a></h2><div class="accs">${ac.map(o=>`<label class="acc${o.p.nt?' nt':''}"><input type="checkbox" data-pnt="${esc(o.p.id)}" ${o.p.nt?'':'checked'} aria-label="Compter dans le solde total"><span>${esc(o.p.name)}</span><b class="${o.v<0&&!hid?'neg':''}">${hid?DOTS:(o.v<0?'−':'')+fmtN(Math.abs(o.v))} <small>${CS()}</small></b></label>`).join('')}</div>`
+    +`<p class="hint">Cochez les comptes à inclure dans le solde total.${S.pays.some(p=>p.init)?'':' Touchez « Modifier » pour indiquer le solde actuel de chaque compte.'}</p>`}
   const td=S.tx.filter(x=>x.date===today()).sort(cmp),tout=sum(td,'out');
   h+=`<h2>Aujourd'hui ${tout?`<span class="mut" translate="no">${esc(tr('−{0} {1} dépensés',['@@',CS()])).replace('@@',hid?DOTS:fmtN(tout))}</span>`:''}</h2>`+(td.length?`<div class="hbtns"><button type="button" class="pill" id="todayToggle" aria-expanded="${!!P.todayOpen}">${P.todayOpen?"Masquer l'aperçu":'Aperçu'}</button></div>`
     +(P.todayOpen?td.slice(0,5).map(x=>txItem(x)).join('')+(td.length>5?`<p class="hint">Aperçu des 5 dernières · ${td.length-5} autre${td.length-5>1?'s':''} dans l'historique.</p>`:''):''):`<div class="empty">Rien de noté aujourd'hui.</div>`);
@@ -741,7 +768,7 @@ let SIM=load('monbudget.sim');if(!SIM||!Array.isArray(SIM.items))SIM={src:'total
 function saveSim(){try{localStorage.setItem('monbudget.sim',JSON.stringify(SIM))}catch(e){}}
 function bSim(){
   if(!SIM.cur)SIM.cur=CUR();if(SIM.cur!==CUR()&&canConv(SIM.cur,CUR())){const k=v=>roundC(conv(+v||0,SIM.cur,CUR()));SIM.custom=k(SIM.custom);SIM.inc=k(SIM.inc);SIM.margin=k(SIM.margin);SIM.items.forEach(x=>x.amount=k(x.amount));SIM.cur=CUR();saveSim()}
-  const bal=sum(S.tx,'in')-sum(S.tx,'out'),pf=S.pays.map(p=>{const f=payFlow(S.tx,p.id);return{p,v:f.i-f.o}});
+  const bal=totalBal(),pf=livePays().map(p=>({p,v:payBal(p.id)})).filter(o=>!o.p.off||o.v||SIM.src==='p:'+o.p.id);
   if(SIM.src!=='total'&&SIM.src!=='custom'&&!pf.some(o=>'p:'+o.p.id===SIM.src))SIM.src='total';
   const avail=SIM.src==='total'?bal:SIM.src==='custom'?SIM.custom:pf.find(o=>'p:'+o.p.id===SIM.src).v;
   const t=new Date(),st=monthStats(t.getFullYear(),t.getMonth()),habit=st.days>=3?Math.max(0,st.proj-st.out):0;
@@ -870,7 +897,7 @@ function vSet(){
     +`</div><div class="sec">Préférences</div><div class="group">`
     +srow({href:'reg-depenses',icon:'out',label:'Catégories de dépenses',value:nOut})
     +srow({href:'reg-entrees',icon:'inn',label:"Catégories d'entrées",value:nIn})
-    +srow({href:'reg-paiements',icon:'wallet',label:'Moyens de paiement',value:S.pays.length})
+    +srow({href:'reg-paiements',icon:'wallet',label:'Moyens de paiement',value:activePays().length})
     +srow({href:'reg-recurrentes',icon:'repeat',label:'Opérations récurrentes',value:S.rec.length})
     +srow({href:'reg-favoris',icon:'star',label:'Dépenses favorites',value:S.fav.length})
     +srow({href:'budget',icon:'pie',label:'Budget mensuel',value:S.budget.on&&S.budget.total?fmtN(S.budget.total)+' '+CS():'Désactivé'})+`</div>`;
@@ -882,7 +909,7 @@ function vSet(){
     +srow({id:'shareBtn',icon:'share',label:"Partager l'application"})
     +srow({id:'guideBtn',icon:'info',label:'Guide de démarrage'})
     +(standalone()?srow({icon:'phone',label:'Installation',value:'Installée',noArrow:1}):srow({id:deferred?'installBtn':'installHelp',icon:'phone',label:'Installer sur ce téléphone'}))
-    +srow({icon:'info',label:'Version',value:'3.7.2',noArrow:1})+`</div>`;
+    +srow({icon:'info',label:'Version',value:'3.8',noArrow:1})+`</div>`;
   h+=`<div class="sec">Zone sensible</div><div class="group">`+(C.user?srow({id:'logoutBtn',icon:'logout',label:'Se déconnecter',noArrow:1}):'')
     +srow({id:'wipeBtn',icon:'trash',label:'Effacer toutes les données',danger:1,noArrow:1})+`</div>`;
   return h+`<p class="ver mut">Mon Budget · ${S.tx.length} opération${S.tx.length>1?'s':''} enregistrée${S.tx.length>1?'s':''}</p></div>`}
@@ -919,7 +946,7 @@ function vDevise(){if(SPACE.kind!=='shared')return `<div class="band top">${subh
 function setSpaceCur(to){const from=CUR();if(from===to)return;const k=v=>roundC(conv(+v||0,from,to),to);
   const b=S.budget;b.total=k(b.total);for(const i in b.cats)b.cats[i]=k(b.cats[i]);
   S.goals.forEach(g=>{g.target=k(g.target);g.saved=k(g.saved)});S.debts.forEach(d=>{d.amount=k(d.amount);d.repaid=k(d.repaid)});
-  S.rec.forEach(r=>r.amount=k(r.amount));S.fav.forEach(f=>f.amount=k(f.amount));S.cur=to;save()}
+  S.rec.forEach(r=>r.amount=k(r.amount));S.fav.forEach(f=>f.amount=k(f.amount));S.pays.forEach(p=>{if(p.init)p.init=k(p.init)});S.cur=to;save()}
 const waitMeta=()=>new Promise(r=>{let n=0;const t=setInterval(()=>{if(!C.user||C.metaReady||++n>40){clearInterval(t);r()}},200)});
 async function askCur(from,to,shared){
   if(!await loadRates()||!canConv(from,to)){toast(tr('Taux de change indisponible : connectez-vous à Internet puis réessayez.'),{warn:1});return false}
@@ -927,7 +954,7 @@ async function askCur(from,to,shared){
 async function chooseCountry(cc){if(!CCUR[cc])return;const to=CCUR[cc];
   if(SPACE.kind!=='me'){switchSpace({kind:'me'});await waitMeta()}
   const from=CUR();if(to!==from){if(!await askCur(from,to))return;setSpaceCur(to)}
-  PROF.country=cc;saveProf();save();location.hash='reglages';render();toast(tr('Pays : {0}',[cname(cc)])+(to!==from?' · '+tr('devise : {0}',[CS(to)]):''))}
+  PROF.country=cc;saveProf();save();P.pc=null;location.replace('#reg-paysmoyens');toast(tr('Pays : {0}',[cname(cc)])+(to!==from?' · '+tr('devise : {0}',[CS(to)]):''))}
 async function chooseSpaceCur(to){const from=CUR();if(to===from)return history.back();if(!await askCur(from,to,1))return;setSpaceCur(to);history.back();toast(tr('Devise du budget partagé : {0}',[curName(to)]))}
 function setLang(l){if(!LANGS[l]||l===LANG)return history.back();PROF.lang=l;saveProf();try{localStorage.removeItem('monbudget.i18n.'+l)}catch(e){}location.hash='reglages';setTimeout(()=>location.reload(),60)}
 function vSecu(){
@@ -938,12 +965,27 @@ function vSecu(){
   <p class="note">Demandé à chaque ouverture de l'application et après 5 minutes en arrière-plan. En secours, le mot de passe de votre compte fonctionne toujours.</p></div>`}
 function vList(kind){
   const T={out:'Catégories de dépenses',in:"Catégories d'entrées",pay:'Moyens de paiement'}[kind];
-  const items=kind==='pay'?S.pays:S.cats.filter(c=>c.type===kind);
-  return `<div class="band top">${subhead(T)}<div class="group">${items.map(it=>kind==='pay'
-      ?`<div class="srow"><span class="si">${SI.wallet}</span><span class="sl">${esc(it.name)}</span><button type="button" class="icon" data-del="pay" data-id="${esc(it.id)}" aria-label="Supprimer ${esc(it.name)}">${I.trash}</button></div>`
+  const items=kind==='pay'?livePays():S.cats.filter(c=>c.type===kind);
+  const sug=kind==='pay'?paySug(PROF.country).filter(n=>!livePays().some(p=>nrm(p.name)===nrm(n))):[];
+  return `<div class="band top">${subhead(T)}${kind==='pay'?`<p class="mut">Cochez ceux que vous utilisez. Touchez le crayon pour indiquer le solde actuel d'un compte : le solde total de l'accueil additionne les comptes que vous y cochez.</p>`:''}<div class="group">${items.map(it=>kind==='pay'
+      ?`<div class="srow pay${it.off?' off':''}"><input type="checkbox" data-poff="${esc(it.id)}" ${it.off?'':'checked'} aria-label="Utiliser ce moyen de paiement"><span class="sl">${esc(it.name)}<small class="sub" translate="no">${esc(tr('Solde : {0}',['@@'])).replace('@@',HB()?DOTS+' '+CS():(payBal(it.id)<0?'−':'')+fmtN(Math.abs(roundC(payBal(it.id))))+' '+CS())}</small></span><button type="button" class="icon" data-pbal="${esc(it.id)}" aria-label="Modifier le solde">${I.edit}</button><button type="button" class="icon" data-del="pay" data-id="${esc(it.id)}" aria-label="Supprimer ${esc(it.name)}">${I.trash}</button></div>`
       :`<div class="srow"><i class="sw" style="--c:${okColor(it.color)}"></i><input class="ename iname" data-kind="${kind}" data-id="${esc(it.id)}" value="${esc(it.name)}" maxlength="30" aria-label="Nom (modifiable)"><button type="button" class="icon" data-del="${kind}" data-id="${esc(it.id)}" aria-label="Supprimer ${esc(it.name)}">${I.trash}</button></div>`).join('')}</div>
   <form class="erow add" data-add="${kind}" style="margin-top:14px"><input placeholder="${kind==='pay'?'Nouveau moyen de paiement…':'Nouvelle catégorie…'}" maxlength="30" aria-label="Nom à ajouter"><button class="primary">Ajouter</button></form>
-  ${kind==='pay'?'':'<p class="note">Touchez un nom pour le modifier.</p>'}</div>`}
+  ${kind==='pay'?(sug.length?`<h2 translate="no">${esc(tr('Suggestions · {0}',[cname(PROF.country)]))}</h2><div class="chips">${sug.map(n=>`<button type="button" class="chip" data-padd="${esc(n)}">+ ${esc(n)}</button>`).join('')}</div>`:'')+'<p class="note">Un moyen de paiement décoché est masqué lors de l\'ajout d\'une opération. La corbeille le supprime de la liste ; ses opérations restent visibles dans l\'historique.</p>':'<p class="note">Touchez un nom pour le modifier.</p>'}</div>`}
+function vPayCountry(){const cc=PROF.country,sug=paySug(cc).filter(n=>!livePays().some(p=>nrm(p.name)===nrm(n)));
+  if(!P.pc)P.pc={on:new Set(activePays().map(p=>p.id)),add:new Set()};
+  const extra=[...P.pc.add].filter(n=>!sug.includes(n)),row=(attr,on,name,del)=>`<div class="srow pay${on?'':' off'}"><input type="checkbox" id="pc_${esc(attr.replace(/\W/g,''))}" ${attr} ${on?'checked':''}><label class="sl" for="pc_${esc(attr.replace(/\W/g,''))}">${esc(name)}</label>${del?`<button type="button" class="icon" data-del="pay" data-id="${esc(del)}" aria-label="Supprimer ${esc(name)}">${I.trash}</button>`:''}</div>`;
+  return `<div class="band top">${subhead('<span translate="no">'+esc(tr('Moyens de paiement · {0}',[cname(cc)]))+'</span>')}
+  <p class="mut">Choisissez les moyens de paiement que vous utilisez dans ce pays. Ceux que vous décochez sont masqués, sans effacer vos opérations ni leurs soldes.</p>
+  <h2>Vos moyens de paiement</h2><div class="group">${livePays().map(p=>row(`data-pcid="${esc(p.id)}"`,P.pc.on.has(p.id),p.name,p.id)).join('')}</div>
+  ${sug.length+extra.length?`<h2 translate="no">${esc(tr('À ajouter · {0}',[cname(cc)]))}</h2><div class="group">${sug.concat(extra).map(n=>row(`data-pcn="${esc(n)}"`,P.pc.add.has(n),n)).join('')}</div>`:''}
+  <form class="erow add" id="pcAdd" style="margin-top:14px"><input placeholder="Autre moyen de paiement…" maxlength="30" aria-label="Nom à ajouter"><button class="primary">Ajouter</button></form>
+  <div class="btns" style="margin-top:18px"><button type="button" class="primary" id="pcSave">Enregistrer</button><button type="button" id="pcLater">Plus tard</button></div></div>`}
+function savePayCountry(){const pc=P.pc;if(!pc)return;
+    if(!pc.add.size&&!livePays().some(p=>pc.on.has(p.id)))return toast('Gardez au moins un moyen de paiement',{warn:1});
+  livePays().forEach(p=>{if(pc.on.has(p.id))delete p.off;else p.off=true});
+  pc.add.forEach(n=>{const d=S.pays.find(p=>p.del&&nrm(p.name)===nrm(n));if(d){delete d.del;delete d.off}else if(!livePays().some(p=>nrm(p.name)===nrm(n)))S.pays.push({id:uid(),name:n.slice(0,30)})});
+  P.pc=null;save();location.replace('#reglages');toast('Moyens de paiement mis à jour')}
 function vRec(){
   let h=`<div class="band top">${subhead('Opérations récurrentes')}`;
   h+=S.rec.length?`<div class="group">${S.rec.map(r=>{const c=cat(r.cat);return `<div class="srow"><i class="sw" style="--c:${okColor(c.color)}"></i><span class="sl">${esc(r.note||c.name)}<small class="sub">${r.type==='in'?'+':'−'}${fmtN(r.amount)} ${CS()} · le ${r.day} de chaque mois · ${esc(pay(r.pay).name)}${r.active?'':' · en pause'}</small></span><button type="button" class="icon" data-ramt="${esc(r.id)}" aria-label="Modifier le montant">${I.edit}</button><button type="button" class="icon" data-rtog="${esc(r.id)}" aria-label="${r.active?'Mettre en pause':'Reprendre'}">${r.active?I.pause:I.play}</button><button type="button" class="icon" data-rdel="${esc(r.id)}" aria-label="Supprimer">${I.trash}</button></div>`}).join('')}</div>`:`<div class="empty">Aucune opération récurrente.</div>`;
@@ -963,16 +1005,21 @@ function runRec(){
       r.last=nx;mk=nx;ch=true}}
   if(ch){save();render()}}
 function newRule(type,amount,catId,payId,note,date){return{id:uid(),type,amount,cat:catId,pay:payId,note,day:Math.min(28,parse(date).getDate()),start:date.slice(0,7),last:prevMonth(date.slice(0,7)),active:true}}
+async function setPayBal(id){const p=S.pays.find(z=>z.id===id);if(!p)return;const cur=roundC(payBal(id));
+  const v=await ask(tr('Solde actuel de « {0} » ({1})',[p.name,CS()]),{input:cur>0&&!HB()?fmtN(cur):'',ok:'Valider',numeric:1});if(v==null)return;
+  const f=payFlow(S.tx,id);p.init=roundC(num(v)-(f.i-f.o));if(!p.init)delete p.init;save();render();toast(tr('Solde de « {0} » mis à jour',[p.name]))}
 async function askAmount(msg,def){const v=await ask(msg,{input:def?fmtN(def):'',ok:'Valider',numeric:1});return v==null?0:num(v)}
 function addItem(kind,name){name=String(name||'').trim().slice(0,30);if(!name)return null;
-  if(kind==='pay'){if(S.pays.some(p=>p.name.toLowerCase()===name.toLowerCase())){toast('Ce moyen de paiement existe déjà');return null}const p={id:uid(),name};S.pays.push(p);save();return p.id}
+  if(kind==='pay'){const dd=S.pays.find(p=>p.del&&nrm(p.name)===nrm(name));if(dd){delete dd.del;save();return dd.id}if(livePays().some(p=>p.name.toLowerCase()===name.toLowerCase())){toast('Ce moyen de paiement existe déjà');return null}const p={id:uid(),name};S.pays.push(p);save();return p.id}
   if(S.cats.some(c=>c.type===kind&&c.name.toLowerCase()===name.toLowerCase())){toast('Cette catégorie existe déjà');return null}
   const c={id:uid(),name,type:kind,color:PALETTE[(S.cats.filter(z=>z.type===kind).length+(kind==='in'?4:0))%12]};S.cats.push(c);save();return c.id}
 function rename(kind,id,v){if(kind==='pay')return;v=v.trim().slice(0,30);const it=kind==='pay'?S.pays.find(p=>p.id===id):S.cats.find(c=>c.id===id);if(!it)return;if(!v){render();return}it.name=v;save();toast('Nom modifié')}
 async function delItem(kind,id){
-  if(kind==='pay'){if(S.pays.length<2)return toast('Gardez au moins un moyen de paiement');const p=pay(id),to=S.pays.find(q=>q.id!==id),used=S.tx.filter(x=>x.pay===id);
-    if(!await ask(used.length?`Supprimer « ${p.name} » ? ${used.length} opération(s) passeront sur « ${to.name} ».`:`Supprimer « ${p.name} » ?`,{ok:'Supprimer',danger:1}))return;
-    used.forEach(x=>x.pay=to.id);S.tx.forEach(x=>{if(x.to===id)x.to=to.id});S.rec.concat(S.fav).forEach(x=>{if(x.pay===id)x.pay=to.id});S.pays=S.pays.filter(q=>q.id!==id)}
+  if(kind==='pay'){const live=livePays();if(live.length<2)return toast('Gardez au moins un moyen de paiement');const p=pay(id),to=live.find(q=>q.id!==id&&!q.off)||live.find(q=>q.id!==id),used=S.tx.filter(x=>x.pay===id||x.to===id);
+    if(!await ask(used.length?tr("Supprimer « {0} » ? Ses {1} opération(s) restent visibles dans l'historique.",[p.name,used.length]):tr('Supprimer « {0} » ?',[p.name]),{ok:'Supprimer',danger:1}))return;
+    S.rec.concat(S.fav).forEach(x=>{if(x.pay===id)x.pay=to.id});if(S.last.pay===id)S.last.pay=to.id;
+    if(used.length){p.del=true;delete p.off;delete p.nt}else S.pays=S.pays.filter(q=>q.id!==id);
+    if(!activePays().length)delete to.off;if(!S.pays.some(inTot))delete to.nt;if(P.pc)P.pc.on.delete(id)}
   else{const c=cat(id),same=S.cats.filter(z=>z.type===c.type&&z.id!==id);if(!same.length)return toast('Gardez au moins une catégorie');
     const to=same.find(z=>/^(divers|autres revenus)$/i.test(z.name))||same[same.length-1],used=S.tx.filter(x=>x.cat===id);
     if(!await ask(used.length?`Supprimer « ${c.name} » ? ${used.length} opération(s) passeront dans « ${to.name} ».`:`Supprimer « ${c.name} » ?`,{ok:'Supprimer',danger:1}))return;
@@ -995,7 +1042,7 @@ async function install(){if(!deferred)return;deferred.prompt();try{await deferre
 async function wipe(){if(!await ask(C.user?'Effacer définitivement toutes les données de votre compte, sur tous vos téléphones ? Cette action est irréversible.':'Effacer définitivement toutes les données de ce téléphone ? Cette action est irréversible.',{ok:'Tout effacer',danger:1}))return;S=fresh();save();render();toast('Toutes les données ont été effacées')}
 
 /* ---------- Navigation ---------- */
-const VIEWS={'reg-pays':vPays,'reg-langue':vLangue,'reg-devise':vDevise,accueil:vHome,historique:vHist,budget:vBudget,reglages:vSet,'reg-compte':vCompte,'reg-securite':vSecu,'reg-depenses':()=>vList('out'),'reg-entrees':()=>vList('in'),'reg-paiements':()=>vList('pay'),'reg-recurrentes':vRec,'reg-favoris':vFav,'reg-partage':vPartage};
+const VIEWS={'reg-paysmoyens':vPayCountry,'reg-pays':vPays,'reg-langue':vLangue,'reg-devise':vDevise,accueil:vHome,historique:vHist,budget:vBudget,reglages:vSet,'reg-compte':vCompte,'reg-securite':vSecu,'reg-depenses':()=>vList('out'),'reg-entrees':()=>vList('in'),'reg-paiements':()=>vList('pay'),'reg-recurrentes':vRec,'reg-favoris':vFav,'reg-partage':vPartage};
 let prevV='';
 let curV='',unlocked=true;
 function render(){
@@ -1016,7 +1063,7 @@ V.addEventListener('pointerdown',e=>{const t=e.target.closest('.tx');if(!t||!t.d
 V.addEventListener('pointermove',e=>{if(LP&&Math.hypot(e.clientX-LP.x,e.clientY-LP.y)>10){clearTimeout(LP.t);LP=null}});
 ['pointerup','pointercancel'].forEach(n=>V.addEventListener(n,()=>{if(LP){clearTimeout(LP.t);LP=null}if(LPdone)setTimeout(()=>LPdone=false,120)}));
 V.addEventListener('contextmenu',e=>{if(curV==='historique'&&e.target.closest('.tx'))e.preventDefault()});
-V.addEventListener('click',e=>{if(LPdone){LPdone=false;e.preventDefault();return}const t=e.target.closest('button,[data-i]');if(!t)return;
+V.addEventListener('click',e=>{if(LPdone){LPdone=false;e.preventDefault();return}const t=e.target.closest('button,[data-i],.dr[data-gotab]');if(!t)return;
   if(t.classList.contains('tx')){if(P.selMode&&curV==='historique'){const id=t.dataset.id;SEL.has(id)?SEL.delete(id):SEL.add(id);t.classList.toggle('on',SEL.has(id));t.setAttribute('aria-pressed',SEL.has(id));return updSel()}
     if(curV==='historique')return txMenu(t.dataset.id);return openTx(t.dataset.id)}
   if(t.dataset.mode){H.mode=t.dataset.mode;return render()}
@@ -1029,6 +1076,10 @@ V.addEventListener('click',e=>{if(LPdone){LPdone=false;e.preventDefault();return
   if(t.dataset.lang)return setLang(t.dataset.lang);
   if(t.dataset.scur)return chooseSpaceCur(t.dataset.scur);
   if(t.dataset.del)return delItem(t.dataset.del,t.dataset.id);
+  if(t.dataset.pbal)return setPayBal(t.dataset.pbal);
+  if(t.dataset.padd){if(addItem('pay',t.dataset.padd)){render();toast('Ajouté')}return}
+  if(t.id==='pcSave')return savePayCountry();
+  if(t.id==='pcLater'){P.pc=null;location.replace('#reglages');return}
   if(t.dataset.fav)return addFav(t.dataset.fav);
   if(t.dataset.space){P.spOpen=false;const sp=t.dataset.space==='me'?{kind:'me'}:(C.spaces||[]).find(z=>z.gid===t.dataset.space);if(sp)switchSpace(sp.kind==='me'?sp:{kind:'shared',gid:sp.gid,name:sp.name});return}
   if(t.id==='spBtn'){P.spOpen=!P.spOpen;return render()}
@@ -1060,6 +1111,9 @@ V.addEventListener('change',e=>{const t=e.target;
   if(t.classList.contains('ename'))return rename(t.dataset.kind,t.dataset.id,t.value);
   if(t.id==='impFile'&&t.files[0]){importFile(t.files[0]);t.value=''}
   if(t.id==='hcat'){H.cat=t.value;return render()}
+  if(t.dataset.pnt){const p=S.pays.find(z=>z.id===t.dataset.pnt);if(!p)return;if(!t.checked&&S.pays.filter(inTot).length<2){t.checked=true;return toast('Gardez au moins un compte dans le solde total',{warn:1})}if(t.checked)delete p.nt;else p.nt=true;save();return render()}
+  if(t.dataset.poff){const p=S.pays.find(z=>z.id===t.dataset.poff);if(!p)return;if(!t.checked&&activePays().length<2){t.checked=true;return toast('Gardez au moins un moyen de paiement',{warn:1})}if(t.checked)delete p.off;else p.off=true;save();return render()}
+  if(t.dataset.pcid||t.dataset.pcn){const pc=P.pc;if(!pc)return;const set=t.dataset.pcid?pc.on:pc.add,k=t.dataset.pcid||t.dataset.pcn;if(t.checked)set.add(k);else set.delete(k);return render()}
   if(t.dataset.son){const x=SIM.items.find(z=>z.id===t.dataset.son);if(x){x.on=t.checked;saveSim()}return render()}
   if(t.id==='simSrc'){SIM.src=t.value;saveSim();return render()}
   if(t.id==='simCustom'||t.id==='simIn'||t.id==='simMargin'){SIM[{simCustom:'custom',simIn:'inc',simMargin:'margin'}[t.id]]=num(t.value);saveSim();return render()}
@@ -1080,6 +1134,7 @@ V.addEventListener('submit',e=>{
   if(e.target.id==='debtForm'){e.preventDefault();const person=$('#dPerson').value.trim(),amount=num($('#dAmount').value);if(!person||!amount)return toast('Indiquez une personne et un montant',{warn:1});
     const d={id:uid(),kind:P.dkind,person,amount,repaid:0,date:$('#dDate').value||today(),due:$('#dDue').value||'',note:$('#dNote').value.trim()};S.debts.push(d);save();render();
     return toast(tr(P.dkind==='lent'?'Prêt enregistré':'Dette enregistrée'),d.due?{act:tr('Rappel'),fn:()=>remindDebt(d.id)}:{})}
+  if(e.target.id==='pcAdd'){e.preventDefault();const i=e.target.querySelector('input'),n=i.value.trim().slice(0,30);if(!n||!P.pc)return;const ex=livePays().find(p=>nrm(p.name)===nrm(n));if(ex)P.pc.on.add(ex.id);else P.pc.add.add(n);render();return}
   const f=e.target.closest('form[data-add]');if(!f)return;e.preventDefault();if(addItem(f.dataset.add,f.querySelector('input').value)){render();toast('Ajouté')}});
 document.addEventListener('input',e=>{const t=e.target;if(!(t.classList&&t.classList.contains('money')))return;const c=t.closest('#txForm')?F.cur:CUR(),dg=digits(c),[g,d]=SEP(),v=t.value;
   const k=dg?v.lastIndexOf(d):-1;
@@ -1106,9 +1161,9 @@ function openModal(){sheet.hidden=false;requestAnimationFrame(()=>requestAnimati
 function closeModal(fromPop){if(!sheet.classList.contains('open'))return;sheet.classList.remove('open');setTimeout(()=>{if(!sheet.classList.contains('open'))sheet.hidden=true},260);if(!fromPop&&history.state&&history.state.m)history.back()}
 addEventListener('popstate',()=>{if(sheet.classList.contains('open'))closeModal(true)});
 function openTx(id,type,mode,goal){const x=id?S.tx.find(t=>t.id===id):null;closeFab();mode=mode||'tx';
-  const lp=S.pays.some(p=>p.id===S.last.pay)?S.last.pay:S.pays[0].id;
+  const lp=activePays().some(p=>p.id===S.last.pay)?S.last.pay:(activePays()[0]||S.pays[0]).id;
   F={mode,type:x?x.type:(type==='in'||type==='tr'?type:'out'),cat:x?x.cat:null,pay:x?x.pay:lp,to:x&&x.to||null,id:x?x.id:null,cur:x?(x.cur||'XAF'):CUR()};
-  if(F.type==='tr'&&!F.to)F.to=(S.pays.find(p=>p.id!==F.pay)||S.pays[0]||{}).id||null;
+  if(F.type==='tr'&&!F.to)F.to=(activePays().find(p=>p.id!==F.pay)||S.pays[0]||{}).id||null;
   const gl=goal&&S.goals.find(z=>z.id===goal);if(gl){F.goal=gl.id;F.src=SPACE.kind==='me'?'me':SPACE.gid}
   $('#amt').value=x?fmtN(x.amount,F.cur):'';$('#date').value=x?x.date:today();$('#note').value=x?x.note||'':'';$('#fee').value=x&&x.fee?fmtN(x.fee,F.cur):'';
   $('#optRec').checked=false;$('#optFav').checked=false;$('#optPrev').checked=!!(x&&x.m);$('#delBtn').hidden=!x;
@@ -1120,7 +1175,7 @@ function fillSheet(){
   if(!S.cats.some(c=>c.id===F.cat&&c.type===F.type)){const l=S.last[F.type];F.cat=S.cats.some(c=>c.id===l&&c.type===F.type)?l:(S.cats.find(c=>c.type===F.type)||{}).id}
   $('#txForm').dataset.type=F.type;$('#amtCur').textContent=CS(F.cur);$('#feeCur').textContent=CS(F.cur);$('#amt').setAttribute('aria-label',tr('Montant')+' ('+CS(F.cur)+')');moneyMode(sheet,F.cur);
   $('#catChips').innerHTML=S.cats.filter(c=>c.type===F.type).map(c=>`<button type="button" class="chip" data-cat="${esc(c.id)}" aria-pressed="${c.id===F.cat}"><i class="sw" style="--c:${okColor(c.color)}"></i> ${esc(c.name)}</button>`).join('')+`<button type="button" class="chip add" data-new="1">+ Nouvelle</button>`;
-  $('#payChips').innerHTML=S.pays.map(p=>`<button type="button" class="chip" data-pay="${esc(p.id)}" aria-pressed="${p.id===F.pay}">${esc(p.name)}</button>`).join('')+`<button type="button" class="chip add" data-new="1">+ Nouveau</button>`;
+  $('#payChips').innerHTML=S.pays.filter(p=>(!p.off&&!p.del)||p.id===F.pay).map(p=>`<button type="button" class="chip" data-pay="${esc(p.id)}" aria-pressed="${p.id===F.pay}">${esc(p.name)}</button>`).join('')+`<button type="button" class="chip add" data-new="1">+ Nouveau</button>`;
   const isTr=F.type==='tr',gm=F.mode==='goal'||F.mode==='goalout';$('#catBox').hidden=isTr||gm;$('#trBox').hidden=!isTr;
   $('#srcBox').hidden=!gm;
   if(gm){$('#srcLbl').textContent=F.mode==='goal'?"Déduire l'argent de":"Remettre l'argent dans";
@@ -1129,7 +1184,7 @@ function fillSheet(){
     $('#srcChips').innerHTML=srcs.map(([k,l])=>`<button type="button" class="chip" data-src="${esc(k)}" aria-pressed="${F.src===k}">${esc(l)}</button>`).join('')}
   const showPay=!gm||F.src!=='none';$('#payLbl').hidden=!showPay;$('#payChips').hidden=!showPay;
   $('#payLbl').textContent=isTr?'De':F.type==='in'?'Reçu par':'Payé par';
-  if(isTr){$('#payChips').querySelector('.chip.add').remove();$('#toChips').innerHTML=S.pays.map(p=>`<button type="button" class="chip" data-to="${esc(p.id)}" aria-pressed="${p.id===F.to}">${esc(p.name)}</button>`).join('')}
+  if(isTr){$('#payChips').querySelector('.chip.add').remove();$('#toChips').innerHTML=S.pays.filter(p=>(!p.off&&!p.del)||p.id===F.to).map(p=>`<button type="button" class="chip" data-to="${esc(p.id)}" aria-pressed="${p.id===F.to}">${esc(p.name)}</button>`).join('')}
   $('#dateW').hidden=F.mode==='fav'||(gm&&F.src==='none');$('#prevW').hidden=F.mode!=='tx'||!$('#optPrev').checked||!F.id;updPrev();$('#dateLbl').textContent=F.mode==='rec'?'Première échéance':'Date';
   $('#micBtn').hidden=!SR||isTr;
   $('#optBox').hidden=!!F.id||isTr||F.mode!=='tx';if(gm)$('#payLbl').textContent=F.mode==='goal'?'Payé par':'Reçu par';$('#optFavW').hidden=F.type!=='out';
@@ -1167,7 +1222,7 @@ function parseSpeech(text){const n=' '+nrm(text)+' ',o={amount:parseAmount(n)},h
   const cats=S.cats.filter(c=>c.type===F.type);let c=cats.filter(c=>n.includes(nrm(c.name))).sort((a,b)=>b.name.length-a.name.length)[0];
   if(!c)for(const[k,ws]of CATK){if(ws.some(has)){c=cats.find(z=>nrm(z.name).includes(k));if(c)break}}
   if(c)o.cat=c.id;
-  let p=S.pays.find(z=>n.includes(nrm(z.name)));if(!p)for(const[k,ws]of PAYK){if(ws.some(has)){p=S.pays.find(z=>nrm(z.name).includes(k));if(p)break}}
+  let p=activePays().find(z=>n.includes(nrm(z.name)));if(!p)for(const[k,ws]of PAYK){if(ws.some(has)){p=activePays().find(z=>nrm(z.name).includes(k));if(p)break}}
   if(p)o.pay=p.id;
   const payW=new Set([...PAYK.flatMap(([,w])=>w.flatMap(x=>x.split(' '))),...S.pays.flatMap(z=>nrm(z.name).split(/\s+/))]);
   o.note=text.split(/\s+/).filter(w=>{const z=nrm(w).replace(/[^a-z0-9]/g,'');return z&&!/^\d/.test(z)&&!STOPW.has(z)&&!payW.has(z)&&!(z in NUMW)}).join(' ').slice(0,80);
