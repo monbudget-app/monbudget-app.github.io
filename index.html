@@ -173,6 +173,8 @@ svg.i{width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:2;stroke
 .srow input.iname{flex:1;min-height:40px;background:var(--bg-input);font-weight:500}
 .srow .icon{width:40px;height:40px;background:none;color:var(--mut)}
 .srow input[type=checkbox]{width:24px;height:24px;min-height:0;accent-color:var(--g);margin:0;flex:none}
+.srow.sim{gap:12px;padding-left:14px}#simAllOn,#simClear{white-space:nowrap}#simAllOn+#simClear{margin-left:14px}.srow.sim .sl{cursor:pointer}.srow.sim.off .sl{opacity:.5;text-decoration:line-through}
+#view .tx{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
 .subhead{display:flex;align-items:center;gap:8px;margin-bottom:18px}
 .subhead h1{font-size:22px;margin:0;flex:1;text-align:center;padding-right:44px}
 .subhead .icon{background:var(--bg-card);border:1px solid var(--line)}
@@ -475,7 +477,7 @@ function loadRates(force){if(!force&&RATES&&Date.now()-RATES.t<12*3600e3)return 
   ratesP.finally(()=>{ratesP=null});return ratesP}
 function rateTxt(from,to){const r=conv(1,to,from);return r>=1?`1 ${CS(to)} = ${fmtN(r,r<100?'USD':from)} ${CS(from)}`:`1 ${CS(from)} = ${fmtN(conv(1,from,to),'USD')} ${CS(to)}`}
 /* Traduction de l'interface */
-const I18NV='36';let DICT=null,TPL=[];const TRC=new Map(),OUT=new Set();
+const I18NV='37';let DICT=null,TPL=[];const TRC=new Map(),OUT=new Set();
 const reEsc=x=>x.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
 function setDict(d){DICT=d&&typeof d==='object'?d:null;TPL=[];TRC.clear();if(!DICT)return;
   for(const k in DICT){if(!/\{\d+\}/.test(k))continue;const ord=[];const re=new RegExp('^'+k.split(/(\{\d+\})/).map(x=>{const m=x.match(/^\{(\d+)\}$/);if(m){ord.push(+m[1]);return '([\\s\\S]*?)'}return reEsc(x)}).join('')+'$');
@@ -591,7 +593,7 @@ function vHome(){
   h+=`<h2>${MY(m,y)}</h2>`+sumCard(sum(mtx,'in'),sum(mtx,'out'),'all',carryBefore(mk),mk,hid);
   if(S.budget.on&&S.budget.total)h+=meter(sum(mtx,'out'),S.budget.total,'Budget du mois');
   const td=S.tx.filter(x=>x.date===today()).sort(cmp),tout=sum(td,'out');
-  h+=`<h2>Aujourd'hui ${tout?`<span class="mut">−${fmtN(tout)} ${CS()} dépensés</span>`:''}</h2>`+(td.length?`<div class="hbtns"><button type="button" class="pill" id="todayToggle" aria-expanded="${!!P.todayOpen}">${P.todayOpen?"Masquer l'aperçu":'Aperçu'}</button></div>`
+  h+=`<h2>Aujourd'hui ${tout?`<span class="mut" translate="no">${esc(tr('−{0} {1} dépensés',['@@',CS()])).replace('@@',hid?DOTS:fmtN(tout))}</span>`:''}</h2>`+(td.length?`<div class="hbtns"><button type="button" class="pill" id="todayToggle" aria-expanded="${!!P.todayOpen}">${P.todayOpen?"Masquer l'aperçu":'Aperçu'}</button></div>`
     +(P.todayOpen?td.slice(0,5).map(x=>txItem(x)).join('')+(td.length>5?`<p class="hint">Aperçu des 5 dernières · ${td.length-5} autre${td.length-5>1?'s':''} dans l'historique.</p>`:''):''):`<div class="empty">Rien de noté aujourd'hui.</div>`);
   const rec=S.tx.filter(x=>x.date!==today()).sort(cmp);
   if(rec.length)h+=`<h2>Opérations précédentes</h2><div class="hbtns"><button type="button" class="pill" id="prevToggle" aria-expanded="${!!P.prevOpen}">${P.prevOpen?"Masquer l'aperçu":'Aperçu'}</button><a class="pill" href="#historique">Tout l'historique</a></div>`
@@ -742,7 +744,7 @@ function bSim(){
   if(SIM.src!=='total'&&SIM.src!=='custom'&&!pf.some(o=>'p:'+o.p.id===SIM.src))SIM.src='total';
   const avail=SIM.src==='total'?bal:SIM.src==='custom'?SIM.custom:pf.find(o=>'p:'+o.p.id===SIM.src).v;
   const t=new Date(),st=monthStats(t.getFullYear(),t.getMonth()),habit=st.days>=3?Math.max(0,st.proj-st.out):0;
-  const plan=SIM.items.reduce((a,x)=>a+x.amount,0),hab=SIM.habit?habit:0,rest=avail+SIM.inc-plan-hab;
+  const son=SIM.items.filter(x=>x.on!==false),plan=son.reduce((a,x)=>a+x.amount,0),hab=SIM.habit?habit:0,rest=avail+SIM.inc-plan-hab,part=son.length<SIM.items.length;
   const ok=rest>=SIM.margin,tight=rest>=0&&!ok;
   let h=`<p class="mut">Ajoutez les dépenses que vous prévoyez pour savoir si c'est réalisable avec l'argent dont vous disposez. Rien n'est enregistré dans vos comptes.</p>
   <div class="card"><label class="fld"><span>Argent disponible</span><select id="simSrc"><option value="total" ${SIM.src==='total'?'selected':''}>Solde total (${esc(money(bal))})</option>${pf.map(o=>`<option value="p:${esc(o.p.id)}" ${SIM.src==='p:'+o.p.id?'selected':''}>${esc(o.p.name)} (${esc(money(o.v))})</option>`).join('')}<option value="custom" ${SIM.src==='custom'?'selected':''}>Autre montant…</option></select></label>
@@ -750,13 +752,14 @@ function bSim(){
   <label class="fld"><span>Entrées prévues (facultatif)</span><span class="minput"><input class="money" id="simIn" inputmode="numeric" value="${SIM.inc?fmtN(SIM.inc):''}" placeholder="Ex. : 50.000"><em>${CS()}</em></span></label>
   <label class="fld"><span>Marge de sécurité à garder (facultatif)</span><span class="minput"><input class="money" id="simMargin" inputmode="numeric" value="${SIM.margin?fmtN(SIM.margin):''}" placeholder="Ex. : 10.000"><em>${CS()}</em></span></label>
   ${habit?`<label class="chk"><input type="checkbox" id="simHabit" ${SIM.habit?'checked':''}>Compter aussi mes dépenses habituelles d'ici la fin du mois (≈ ${fmtN(habit)} ${CS()})</label>`:''}</div>
-  <h2>Dépenses prévues ${SIM.items.length?`<button type="button" class="link" id="simClear">Tout effacer</button>`:''}</h2>`;
-  h+=SIM.items.length?`<div class="group">${SIM.items.map(x=>`<div class="srow"><span class="sl">${esc(x.name)}<small class="sub">${fmtN(x.amount)} ${CS()}</small></span><button type="button" class="pill sm" data-snote="${esc(x.id)}">Modifier</button><button type="button" class="icon" data-sdel="${esc(x.id)}" aria-label="Retirer de la simulation">${I.trash}</button></div>`).join('')}</div>`:`<div class="empty">Aucune dépense dans la simulation.</div>`;
+  <h2>Dépenses prévues ${part?`<button type="button" class="link h2b" id="simAllOn">Tout cocher</button>`:''}${SIM.items.length?`<button type="button" class="link${part?'':' h2b'}" id="simClear" style="font-size:15px">Tout effacer</button>`:''}</h2>`;
+  h+=SIM.items.length?`<div class="group">${SIM.items.map(x=>`<div class="srow sim${x.on===false?' off':''}"><input type="checkbox" id="sc_${esc(x.id)}" data-son="${esc(x.id)}" ${x.on!==false?'checked':''} aria-label="Compter cette dépense dans le résultat"><label class="sl" for="sc_${esc(x.id)}">${esc(x.name)}<small class="sub">${fmtN(x.amount)} ${CS()}</small></label><button type="button" class="pill sm" data-snote="${esc(x.id)}">Modifier</button><button type="button" class="icon" data-sdel="${esc(x.id)}" aria-label="Retirer de la simulation">${I.trash}</button></div>`).join('')}</div>`:`<div class="empty">Aucune dépense dans la simulation.</div>`;
   const ed=P.simEdit&&SIM.items.find(x=>x.id===P.simEdit);if(P.simEdit&&!ed)P.simEdit=null;
   h+=`${ed?'<p class="hint" style="margin-top:14px">Modification de la dépense prévue</p>':''}<form class="simf" id="simForm" novalidate style="margin-top:${ed?4:12}px"><input id="simName" maxlength="40" placeholder="Ex. : Chaussures" enterkeyhint="next" value="${ed?esc(ed.name):''}"><span class="minput"><input class="money" id="simAmt" inputmode="numeric" placeholder="Montant" enterkeyhint="done" value="${ed?fmtN(ed.amount):''}"><em>${CS()}</em></span><div class="btns"><button class="primary" type="submit">${ed?'Enregistrer':'Valider'}</button>${ed?'<button type="button" id="simCancel">Annuler</button>':''}</div></form>`;
-  h+=`<h2>Résultat</h2><div class="sum"><div><span>Argent disponible</span><b>${money(avail)}</b></div>${SIM.inc?`<div><span>Entrées prévues</span><b class="pos">+${fmtN(SIM.inc)} <small>${CS()}</small></b></div>`:''}<div><span>Dépenses prévues</span><b class="neg">−${fmtN(plan)} <small>${CS()}</small></b></div>${hab?`<div><span>Dépenses habituelles</span><b class="neg">−${fmtN(hab)} <small>${CS()}</small></b></div>`:''}<div><span>Il resterait</span><b class="${rest<0?'neg':''}">${rest<0?'−':''}${fmtN(rest)} <small>${CS()}</small></b></div></div>`;
-  if(SIM.items.length)h+=`<div class="verdict ${ok?'ok':tight?'tight':'ko'}"><b>${ok?'Réalisable':tight?'Réalisable, mais juste':'Pas réalisable'}</b><span>${ok?(SIM.margin?`Il vous resterait au moins votre marge de ${fmtN(SIM.margin)} ${CS()}.`:'Vous avez assez pour toutes ces dépenses.'):tight?`Il resterait ${fmtN(rest)} ${CS()}, moins que votre marge de ${fmtN(SIM.margin)} ${CS()}.`:`Il manque ${fmtN(-rest)} ${CS()}. Retirez ou réduisez certaines dépenses.`}</span></div>`;
-  if(SIM.items.length&&S.budget.on&&S.budget.total){const after=st.out+plan+hab,p=Math.round(after/S.budget.total*100);h+=`<p class="hint ${p>100?'warnt':''}">${esc(tr(p>100?'Avec ces dépenses, votre budget du mois serait utilisé à {0} % (dépassement de {1}).':'Avec ces dépenses, votre budget du mois serait utilisé à {0} %.',[p,money(after-S.budget.total)]))}</p>`}
+  h+=`<h2>Résultat</h2><div class="sum"><div><span>Argent disponible</span><b>${money(avail)}</b></div>${SIM.inc?`<div><span>Entrées prévues</span><b class="pos">+${fmtN(SIM.inc)} <small>${CS()}</small></b></div>`:''}<div><span${part?' translate="no"':''}>${part?esc(tr('Dépenses prévues ({0} sur {1})',[son.length,SIM.items.length])):'Dépenses prévues'}</span><b class="neg">−${fmtN(plan)} <small>${CS()}</small></b></div>${hab?`<div><span>Dépenses habituelles</span><b class="neg">−${fmtN(hab)} <small>${CS()}</small></b></div>`:''}<div><span>Il resterait</span><b class="${rest<0?'neg':''}">${rest<0?'−':''}${fmtN(rest)} <small>${CS()}</small></b></div></div>`;
+  if(SIM.items.length&&!son.length)h+=`<p class="hint">Cochez au moins une dépense pour voir le résultat.</p>`;
+  if(son.length)h+=`<div class="verdict ${ok?'ok':tight?'tight':'ko'}"><b>${ok?'Réalisable':tight?'Réalisable, mais juste':'Pas réalisable'}</b><span>${ok?(SIM.margin?`Il vous resterait au moins votre marge de ${fmtN(SIM.margin)} ${CS()}.`:(part?'Vous avez assez pour les dépenses cochées.':'Vous avez assez pour toutes ces dépenses.')):tight?`Il resterait ${fmtN(rest)} ${CS()}, moins que votre marge de ${fmtN(SIM.margin)} ${CS()}.`:`Il manque ${fmtN(-rest)} ${CS()}. Retirez ou réduisez certaines dépenses.`}</span></div>`;
+  if(son.length&&S.budget.on&&S.budget.total){const after=st.out+plan+hab,p=Math.round(after/S.budget.total*100);h+=`<p class="hint ${p>100?'warnt':''}">${esc(tr(p>100?'Avec ces dépenses, votre budget du mois serait utilisé à {0} % (dépassement de {1}).':'Avec ces dépenses, votre budget du mois serait utilisé à {0} %.',[p,money(after-S.budget.total)]))}</p>`}
   return h}
 function monthsLeft(due){const d=parse(due),t=new Date();if(d<=t)return 0;return Math.max(1,(d.getFullYear()-t.getFullYear())*12+d.getMonth()-t.getMonth())}
 function bGoals(){
@@ -878,7 +881,7 @@ function vSet(){
     +srow({id:'shareBtn',icon:'share',label:"Partager l'application"})
     +srow({id:'guideBtn',icon:'info',label:'Guide de démarrage'})
     +(standalone()?srow({icon:'phone',label:'Installation',value:'Installée',noArrow:1}):srow({id:deferred?'installBtn':'installHelp',icon:'phone',label:'Installer sur ce téléphone'}))
-    +srow({icon:'info',label:'Version',value:'3.6',noArrow:1})+`</div>`;
+    +srow({icon:'info',label:'Version',value:'3.7',noArrow:1})+`</div>`;
   h+=`<div class="sec">Zone sensible</div><div class="group">`+(C.user?srow({id:'logoutBtn',icon:'logout',label:'Se déconnecter',noArrow:1}):'')
     +srow({id:'wipeBtn',icon:'trash',label:'Effacer toutes les données',danger:1,noArrow:1})+`</div>`;
   return h+`<p class="ver mut">Mon Budget · ${S.tx.length} opération${S.tx.length>1?'s':''} enregistrée${S.tx.length>1?'s':''}</p></div>`}
@@ -1006,7 +1009,13 @@ function render(){
   const s=$('#chart');if(s)ro.observe(s);if(changed)scrollTo(0,0);
 }
 addEventListener('hashchange',render);
-V.addEventListener('click',e=>{const t=e.target.closest('button,[data-i]');if(!t)return;
+let LP=null,LPdone=false;
+V.addEventListener('pointerdown',e=>{const t=e.target.closest('.tx');if(!t||!t.dataset.id||curV!=='historique')return;if(LP)clearTimeout(LP.t);
+  LP={x:e.clientX,y:e.clientY,t:setTimeout(()=>{LP=null;LPdone=true;const id=t.dataset.id;if(!P.selMode){P.selMode=true;SEL.clear()}SEL.add(id);try{navigator.vibrate&&navigator.vibrate(25)}catch(_){}render()},500)}});
+V.addEventListener('pointermove',e=>{if(LP&&Math.hypot(e.clientX-LP.x,e.clientY-LP.y)>10){clearTimeout(LP.t);LP=null}});
+['pointerup','pointercancel'].forEach(n=>V.addEventListener(n,()=>{if(LP){clearTimeout(LP.t);LP=null}if(LPdone)setTimeout(()=>LPdone=false,120)}));
+V.addEventListener('contextmenu',e=>{if(curV==='historique'&&e.target.closest('.tx'))e.preventDefault()});
+V.addEventListener('click',e=>{if(LPdone){LPdone=false;e.preventDefault();return}const t=e.target.closest('button,[data-i]');if(!t)return;
   if(t.classList.contains('tx')){if(P.selMode&&curV==='historique'){const id=t.dataset.id;SEL.has(id)?SEL.delete(id):SEL.add(id);t.classList.toggle('on',SEL.has(id));t.setAttribute('aria-pressed',SEL.has(id));return updSel()}
     if(curV==='historique')return txMenu(t.dataset.id);return openTx(t.dataset.id)}
   if(t.dataset.mode){H.mode=t.dataset.mode;return render()}
@@ -1037,7 +1046,7 @@ V.addEventListener('click',e=>{const t=e.target.closest('button,[data-i]');if(!t
   if(t.dataset.rdel)return delObj('rec',t.dataset.rdel,"Supprimer cette opération récurrente ? Les opérations déjà ajoutées restent dans l'historique.");
   if(t.dataset.rtog){const r=S.rec.find(z=>z.id===t.dataset.rtog);if(r){r.active=!r.active;if(r.active){const tt=new Date(),cm=monthKey(tt.getFullYear(),tt.getMonth());r.last=prevMonth(cm)}save();runRec();render();toast(r.active?'Opération reprise':'Opération mise en pause')}return}
   if(t.dataset.ramt){const r=S.rec.find(z=>z.id===t.dataset.ramt);if(r)askAmount(tr('Nouveau montant mensuel ({0})',[CS()]),r.amount).then(v=>{if(v){r.amount=v;save();render();toast('Montant modifié pour les prochains mois')}});return}
-  const A={shareBtn:share,installBtn:install,expBtn:exportJSON,csvBtn:exportCSV,wipeBtn:wipe,goOut:()=>openTx(null,'out'),goIn:()=>openTx(null,'in'),logoutBtn:()=>logout(),goAuth2:()=>showAuth(true),installHelp:()=>ask("Dans Chrome, ouvrez le menu ⋮ puis touchez « Ajouter à l'écran d'accueil » ou « Installer l'application ».",{ok:'Fermer'}),goAuth:()=>showAuth(true),bilanBtn:shareBilan,newRecOut:()=>openTx(null,'out','rec'),newRecIn:()=>openTx(null,'in','rec'),newFav:()=>openTx(null,'out','fav'),hclear:()=>{H.q='';H.cat='';H.pay='';render()},bilanYBtn:()=>shareBilan('year'),prevToggle:()=>{P.prevOpen=!P.prevOpen;render()},simCancel:()=>{P.simEdit=null;render()},todayToggle:()=>{P.todayOpen=!P.todayOpen;render()},eyeBtn:()=>toggleBal(),perBtn:()=>openPeriod(),selToggle:()=>{P.selMode=!P.selMode;SEL.clear();render()},selAll:()=>{const all=LASTLIST.every(id=>SEL.has(id));LASTLIST.forEach(id=>all?SEL.delete(id):SEL.add(id));$$('#view .tx.sel').forEach(b=>b.classList.toggle('on',SEL.has(b.dataset.id)));updSel()},selDel:()=>delSelected(),simClear:async()=>{if(await ask('Effacer toutes les dépenses de la simulation ?',{ok:'Effacer',danger:1})){SIM.items=[];saveSim();render()}},guideBtn:()=>showGuide(),
+  const A={shareBtn:share,installBtn:install,expBtn:exportJSON,csvBtn:exportCSV,wipeBtn:wipe,goOut:()=>openTx(null,'out'),goIn:()=>openTx(null,'in'),logoutBtn:()=>logout(),goAuth2:()=>showAuth(true),installHelp:()=>ask("Dans Chrome, ouvrez le menu ⋮ puis touchez « Ajouter à l'écran d'accueil » ou « Installer l'application ».",{ok:'Fermer'}),goAuth:()=>showAuth(true),bilanBtn:shareBilan,newRecOut:()=>openTx(null,'out','rec'),newRecIn:()=>openTx(null,'in','rec'),newFav:()=>openTx(null,'out','fav'),hclear:()=>{H.q='';H.cat='';H.pay='';render()},bilanYBtn:()=>shareBilan('year'),prevToggle:()=>{P.prevOpen=!P.prevOpen;render()},simCancel:()=>{P.simEdit=null;render()},simAllOn:()=>{SIM.items.forEach(x=>x.on=true);saveSim();render()},todayToggle:()=>{P.todayOpen=!P.todayOpen;render()},eyeBtn:()=>toggleBal(),perBtn:()=>openPeriod(),selToggle:()=>{P.selMode=!P.selMode;SEL.clear();render()},selAll:()=>{const all=LASTLIST.every(id=>SEL.has(id));LASTLIST.forEach(id=>all?SEL.delete(id):SEL.add(id));$$('#view .tx.sel').forEach(b=>b.classList.toggle('on',SEL.has(b.dataset.id)));updSel()},selDel:()=>delSelected(),simClear:async()=>{if(await ask('Effacer toutes les dépenses de la simulation ?',{ok:'Effacer',danger:1})){SIM.items=[];saveSim();render()}},guideBtn:()=>showGuide(),
     verSend:async()=>{try{await C.Au.sendEmailVerification(C.user);toast(tr('Lien envoyé à {0}',[C.user.email]))}catch(e){toast(e.code==='auth/too-many-requests'?tr('Trop de demandes, réessayez plus tard'):tr('Envoi impossible : {0}',[e.code||'']),{warn:1})}},
     verDone:async()=>{try{await C.user.reload()}catch(e){}if(C.user.emailVerified){toast('Adresse e-mail vérifiée, merci !');render()}else toast("Pas encore vérifiée : ouvrez le lien reçu par e-mail",{warn:1})},
     delAccount:()=>deleteAccount(),verLater:()=>{P.verHide=true;render()},spShare:()=>shareCode(),spRename:()=>renameSpace(),spLeave:()=>leaveSpace(),spDelete:()=>deleteSpace()};if(A[t.id])A[t.id]()});
@@ -1049,6 +1058,7 @@ V.addEventListener('change',e=>{const t=e.target;
   if(t.classList.contains('ename'))return rename(t.dataset.kind,t.dataset.id,t.value);
   if(t.id==='impFile'&&t.files[0]){importFile(t.files[0]);t.value=''}
   if(t.id==='hcat'){H.cat=t.value;return render()}
+  if(t.dataset.son){const x=SIM.items.find(z=>z.id===t.dataset.son);if(x){x.on=t.checked;saveSim()}return render()}
   if(t.id==='simSrc'){SIM.src=t.value;saveSim();return render()}
   if(t.id==='simCustom'||t.id==='simIn'||t.id==='simMargin'){SIM[{simCustom:'custom',simIn:'inc',simMargin:'margin'}[t.id]]=num(t.value);saveSim();return render()}
   if(t.id==='simHabit'){SIM.habit=t.checked;saveSim();return render()}
@@ -1247,7 +1257,7 @@ $('#pkB').addEventListener('click',e=>{const b=e.target.closest('button');if(!b|
 /* menu d'une opération (historique) */
 function txMenu(id){const x=S.tx.find(z=>z.id===id);if(!x)return;const xc=x.cur||'XAF';
   pickOpen((x.type==='tr'?tr('Transfert'):TN(cat(x.cat).name))+' · '+(x.type==='in'?'+':x.type==='out'?'−':'')+fmtN(x.amount,xc)+'\u00a0'+CS(xc)+' · '+dayLabel(x.date),
-  `<div class="pkl"><button type="button" class="pko" data-tm="edit" data-tid="${esc(id)}">${SI.pen}<span>Modifier</span></button><button type="button" class="pko" data-tm="sel" data-tid="${esc(id)}">${SI.checkSq}<span>Sélectionner</span></button><button type="button" class="pko danger" data-tm="del" data-tid="${esc(id)}">${I.trash}<span>Supprimer</span></button></div>`)}
+  `<div class="pkl"><button type="button" class="pko" data-tm="edit" data-tid="${esc(id)}">${SI.pen}<span>Modifier</span></button><button type="button" class="pko" data-tm="sel" data-tid="${esc(id)}">${SI.checkSq}<span>Sélectionner</span></button><button type="button" class="pko danger" data-tm="del" data-tid="${esc(id)}">${I.trash}<span>Supprimer</span></button></div><p class="hint" style="margin:10px 4px 0">Astuce : restez appuyé sur une opération pour la sélectionner directement.</p>`)}
 async function delOne(id){const i=S.tx.findIndex(t=>t.id===id);if(i<0)return;if(!await ask(tr('Supprimer cette opération ?'),{ok:tr('Supprimer'),danger:1}))return;
   const[x]=S.tx.splice(i,1);save();render();toast(tr('Opération supprimée'),{act:'Annuler',fn:()=>{S.tx.push(x);save();render()}})}
 /* sélection multiple dans l'historique */
