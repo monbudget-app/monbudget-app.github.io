@@ -135,6 +135,7 @@ svg.i{width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:2;stroke
 .minput{display:flex;align-items:center;gap:8px;margin-top:6px}
 .minput input{color:var(--ink);font-weight:500}
 .minput em{font-style:normal;color:var(--mut);font-weight:600}
+.minput input{flex:1;min-width:0}.card .minput .okb{flex:none;min-height:44px;padding:8px 16px;border:0;border-radius:12px;background:var(--g)!important;color:var(--onG);font-weight:700}.okb[hidden]{display:none!important}
 .bc{border-bottom:1px solid var(--line);padding-bottom:4px}
 .bc .fld>span:first-child{color:var(--ink)}
 
@@ -748,9 +749,9 @@ function bSim(){
   const ok=rest>=SIM.margin,tight=rest>=0&&!ok;
   let h=`<p class="mut">Ajoutez les dépenses que vous prévoyez pour savoir si c'est réalisable avec l'argent dont vous disposez. Rien n'est enregistré dans vos comptes.</p>
   <div class="card"><label class="fld"><span>Argent disponible</span><select id="simSrc"><option value="total" ${SIM.src==='total'?'selected':''}>Solde total (${esc(money(bal))})</option>${pf.map(o=>`<option value="p:${esc(o.p.id)}" ${SIM.src==='p:'+o.p.id?'selected':''}>${esc(o.p.name)} (${esc(money(o.v))})</option>`).join('')}<option value="custom" ${SIM.src==='custom'?'selected':''}>Autre montant…</option></select></label>
-  ${SIM.src==='custom'?`<label class="fld"><span>Montant disponible</span><span class="minput"><input class="money" id="simCustom" inputmode="numeric" value="${SIM.custom?fmtN(SIM.custom):''}" placeholder="Ex. : 100.000"><em>${CS()}</em></span></label>`:''}
-  <label class="fld"><span>Entrées prévues (facultatif)</span><span class="minput"><input class="money" id="simIn" inputmode="numeric" value="${SIM.inc?fmtN(SIM.inc):''}" placeholder="Ex. : 50.000"><em>${CS()}</em></span></label>
-  <label class="fld"><span>Marge de sécurité à garder (facultatif)</span><span class="minput"><input class="money" id="simMargin" inputmode="numeric" value="${SIM.margin?fmtN(SIM.margin):''}" placeholder="Ex. : 10.000"><em>${CS()}</em></span></label>
+  ${SIM.src==='custom'?`<label class="fld"><span>Montant disponible</span><span class="minput"><input class="money" id="simCustom" inputmode="numeric" enterkeyhint="done" value="${SIM.custom?fmtN(SIM.custom):''}" placeholder="Ex. : 100.000"><em>${CS()}</em><button type="button" class="okb" data-simok="simCustom" hidden>OK</button></span></label>`:''}
+  <label class="fld"><span>Entrées prévues (facultatif)</span><span class="minput"><input class="money" id="simIn" inputmode="numeric" enterkeyhint="done" value="${SIM.inc?fmtN(SIM.inc):''}" placeholder="Ex. : 50.000"><em>${CS()}</em><button type="button" class="okb" data-simok="simIn" hidden>OK</button></span></label>
+  <label class="fld"><span>Marge de sécurité à garder (facultatif)</span><span class="minput"><input class="money" id="simMargin" inputmode="numeric" enterkeyhint="done" value="${SIM.margin?fmtN(SIM.margin):''}" placeholder="Ex. : 10.000"><em>${CS()}</em><button type="button" class="okb" data-simok="simMargin" hidden>OK</button></span></label>
   ${habit?`<label class="chk"><input type="checkbox" id="simHabit" ${SIM.habit?'checked':''}>Compter aussi mes dépenses habituelles d'ici la fin du mois (≈ ${fmtN(habit)} ${CS()})</label>`:''}</div>
   <h2>Dépenses prévues ${SIM.items.length?`<button type="button" class="link h2b" id="simClear">Tout effacer</button>`:''}</h2>${SIM.items.length?`<div class="simsel"><button type="button" class="pill sm" id="simAllOn" ${part?'':'disabled'}>Tout cocher</button><button type="button" class="pill sm" id="simAllOff" ${son.length?'':'disabled'}>Tout décocher</button></div>`:''}`;
   h+=SIM.items.length?`<div class="group">${SIM.items.map(x=>`<div class="srow sim${x.on===false?' off':''}"><input type="checkbox" id="sc_${esc(x.id)}" data-son="${esc(x.id)}" ${x.on!==false?'checked':''} aria-label="Compter cette dépense dans le résultat"><label class="sl" for="sc_${esc(x.id)}">${esc(x.name)}<small class="sub">${fmtN(x.amount)} ${CS()}</small></label><button type="button" class="pill sm" data-snote="${esc(x.id)}">Modifier</button><button type="button" class="icon" data-sdel="${esc(x.id)}" aria-label="Retirer de la simulation">${I.trash}</button></div>`).join('')}</div>`:`<div class="empty">Aucune dépense dans la simulation.</div>`;
@@ -881,7 +882,7 @@ function vSet(){
     +srow({id:'shareBtn',icon:'share',label:"Partager l'application"})
     +srow({id:'guideBtn',icon:'info',label:'Guide de démarrage'})
     +(standalone()?srow({icon:'phone',label:'Installation',value:'Installée',noArrow:1}):srow({id:deferred?'installBtn':'installHelp',icon:'phone',label:'Installer sur ce téléphone'}))
-    +srow({icon:'info',label:'Version',value:'3.7.1',noArrow:1})+`</div>`;
+    +srow({icon:'info',label:'Version',value:'3.7.2',noArrow:1})+`</div>`;
   h+=`<div class="sec">Zone sensible</div><div class="group">`+(C.user?srow({id:'logoutBtn',icon:'logout',label:'Se déconnecter',noArrow:1}):'')
     +srow({id:'wipeBtn',icon:'trash',label:'Effacer toutes les données',danger:1,noArrow:1})+`</div>`;
   return h+`<p class="ver mut">Mon Budget · ${S.tx.length} opération${S.tx.length>1?'s':''} enregistrée${S.tx.length>1?'s':''}</p></div>`}
@@ -1040,6 +1041,7 @@ V.addEventListener('click',e=>{if(LPdone){LPdone=false;e.preventDefault();return
   if(t.dataset.drem)return remindDebt(t.dataset.drem);
   if(t.dataset.ddel)return delObj('debts',t.dataset.ddel,'Supprimer ce prêt / cette dette ?');
   if(t.dataset.drep)return debtRepay(t.dataset.drep);
+  if(t.dataset.simok){const x=$('#'+t.dataset.simok);if(x){SIM[SIMF[x.id]]=num(x.value);saveSim()}return render()}
   if(t.dataset.sdel){SIM.items=SIM.items.filter(x=>x.id!==t.dataset.sdel);saveSim();return render()}
   if(t.dataset.snote){P.simEdit=t.dataset.snote;render();setTimeout(()=>{const x=$('#simName');if(x){x.scrollIntoView({block:'center'});x.focus()}},60);return}
   if(t.dataset.fdel)return delObj('fav',t.dataset.fdel,'Supprimer cette dépense favorite ?');
@@ -1063,7 +1065,9 @@ V.addEventListener('change',e=>{const t=e.target;
   if(t.id==='simCustom'||t.id==='simIn'||t.id==='simMargin'){SIM[{simCustom:'custom',simIn:'inc',simMargin:'margin'}[t.id]]=num(t.value);saveSim();return render()}
   if(t.id==='simHabit'){SIM.habit=t.checked;saveSim();return render()}
   if(t.id==='hpay'){H.pay=t.value;return render()}});
-V.addEventListener('keydown',e=>{if(e.key==='Enter'&&e.target.id==='simName'){e.preventDefault();const a=$('#simAmt');if(a)a.focus()}});
+V.addEventListener('keydown',e=>{if(e.key==='Enter'&&e.target.id==='simName'){e.preventDefault();const a=$('#simAmt');if(a)a.focus()}if(e.key==='Enter'&&SIMF[e.target.id]){e.preventDefault();e.target.blur()}});
+const SIMF={simCustom:'custom',simIn:'inc',simMargin:'margin'};
+V.addEventListener('input',e=>{const t=e.target,k=SIMF[t.id];if(!k)return;const b=t.parentElement.querySelector('.okb');if(b)b.hidden=num(t.value)===(+SIM[k]||0)});
 V.addEventListener('input',e=>{if(e.target.id==='cq'){const q=nrm(e.target.value.trim());$$('#clist [data-q]').forEach(b=>b.hidden=!!q&&!b.dataset.q.includes(q));return}if(e.target.id==='hq'){H.q=e.target.value;clearTimeout(hqT);hqT=setTimeout(render,250)}});
 V.addEventListener('submit',e=>{
   if(e.target.id==='spCreate'){e.preventDefault();const n=$('#spName').value.trim();if(!n)return toast('Donnez un nom au budget partagé',{warn:1});return createSpace(n)}
